@@ -21,8 +21,6 @@ public static partial class Utils
                 GetWindowLong = GetWindowLongPtr64;
                 SetWindowLong = SetWindowLongPtr64;
             }
-
-            GetDPI(out DpiX, out DpiY);
         }
 
         public static Func<IntPtr, int, IntPtr, IntPtr> SetWindowLong;
@@ -257,23 +255,8 @@ public static partial class Utils
         public static int SignedLOWORD(int n) => (short)(n & 0xFFFF);
 
         #region DPI
-        public static double DpiX, DpiY;
-        public static int DpiXSource, DpiYSource;
-        const int LOGPIXELSX = 88, LOGPIXELSY = 90;
-        [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true, ExactSpelling = true)]
-        public static extern int GetDeviceCaps(IntPtr hDC, int nIndex);
-        public static void GetDPI(out double dpiX, out double dpiY) => GetDPI(IntPtr.Zero, out dpiX, out dpiY);
-        public static void GetDPI(IntPtr handle, out double dpiX, out double dpiY)
-        {
-            Graphics GraphicsObject = Graphics.FromHwnd(handle); // DESKTOP Handle
-            IntPtr dcHandle = GraphicsObject.GetHdc();
-            DpiXSource = GetDeviceCaps(dcHandle, LOGPIXELSX);
-            dpiX = DpiXSource / 96.0;
-            DpiYSource = GetDeviceCaps(dcHandle, LOGPIXELSY);
-            dpiY = DpiYSource / 96.0;
-            GraphicsObject.ReleaseHdc(dcHandle);
-            GraphicsObject.Dispose();
-        }
+        public static double DpiX = 0, DpiY = 0;
+        public static double DpiXSource = 96, DpiYSource = 96;
         #endregion
     }
 }
