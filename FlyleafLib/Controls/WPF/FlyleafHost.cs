@@ -1911,6 +1911,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             DpiY = e.NewDpi.DpiScaleY;
             DpiXSource = e.NewDpi.PixelsPerInchX;
             DpiYSource = e.NewDpi.PixelsPerInchY;
+            SetRectOverlay(null, null);
         }
     }
 
@@ -2147,6 +2148,10 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
     }
     public virtual void Detach()
     {
+        /* TODO
+         * Restoring to rectDetachedLast does not take count the DPI changes (also needs to calculate/check the DPI at that point before detaching)
+         */
+
         if (IsFullScreen)
             IsFullScreen = false;
 
@@ -2344,6 +2349,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
                 Surface.DragEnter   -= Surface_DragEnter;
                 Surface.StateChanged-= Surface_StateChanged;
                 Surface.SizeChanged -= SetRectOverlay;
+                Surface.DpiChanged  -= Surface_DpiChanged;
 
                 // If not shown yet app will not close properly
                 if (!surfaceClosed)
@@ -2360,6 +2366,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
 
             if (Owner != null)
                 Owner.DpiChanged -= Owner_DpiChanged;
+
             Surface = null;
             Overlay = null;
             Owner   = null;
