@@ -161,11 +161,21 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock
                             Width="180"
-                            Text="HDR to SDR Tone" />
+                            Text="SDR Display Nits" />
+                        <Slider
+                            Width="200"
+                            Value="{Binding FL.PlayerConfig.Video.SDRDisplayNits}"
+                            Minimum="25"
+                            Maximum="400"
+                            Style="{StaticResource MaterialDesignDiscreteSlider}"
+                            materialDesign:SliderAssist.OnlyShowFocusVisualWhileDragging="True"
+                            VerticalAlignment="Center"
+                            IsSnapToTickEnabled="True" />
                         <TextBox
-                            Width="100"
-                            Text="{Binding FL.PlayerConfig.Video.HDRtoSDRTone}"
-                            helpers:TextBoxHelper.OnlyNumeric="Double" />
+                            Width="30"
+                            Margin="4 0 0 0"
+                            Text="{Binding FL.PlayerConfig.Video.SDRDisplayNits}"
+                            helpers:TextBoxHelper.OnlyNumeric="Int" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
@@ -181,51 +191,44 @@
             </GroupBox>
 
             <GroupBox Header="Filters">
-                <StackPanel>
-                    <ItemsControl ItemsSource="{Binding FL.PlayerConfig.Video.Filters.Values}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel
-                                    Orientation="Horizontal"
-                                    Margin="0 0 0 8"
-                                    Visibility="{Binding Available, Converter={StaticResource BooleanToVisibilityConv}}">
-                                    <TextBlock
-                                        Width="180"
-                                        Text="{Binding Filter}" />
-                                    <Slider
-                                        Width="200"
-                                        Value="{Binding Value}"
-                                        Minimum="{Binding Minimum}"
-                                        Maximum="{Binding Maximum}"
-                                        Style="{StaticResource MaterialDesignDiscreteSlider}"
-                                        materialDesign:SliderAssist.OnlyShowFocusVisualWhileDragging="True"
-                                        VerticalAlignment="Center"
-                                        IsSnapToTickEnabled="True" />
-                                    <TextBox
-                                        Width="30"
-                                        Margin="4 0 0 0"
-                                        Text="{Binding Value}"
-                                        helpers:TextBoxHelper.OnlyNumeric="Int" />
-                                    <Button
-                                        Margin="6 0 0 0"
-                                        ToolTip="Reset to default"
-                                        Style="{StaticResource MaterialDesignIconButton}"
-                                        HorizontalAlignment="Center"
-                                        Width="24"
-                                        Height="24"
-                                        Command="{Binding SetDefaultValue}">
-                                        <materialDesign:PackIcon Kind="BackupRestore" />
-                                    </Button>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <TextBlock Margin="10 10 10 0">
-                        Some filters will not work unless the Video Processor is D3D11.
-                        If you want to use them, Please set Video Processor to D3D11 in the Video Settings above.
-                    </TextBlock>
-                </StackPanel>
+                <ItemsControl ItemsSource="{Binding FL.PlayerConfig.Video.Filters.Values}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Margin="0 0 0 8"
+                                Visibility="{Binding Available, Converter={StaticResource BooleanToVisibilityConv}}">
+                                <TextBlock
+                                    Width="180"
+                                    Text="{Binding Filter}" />
+                                <Slider
+                                    Width="200"
+                                    Value="{Binding Value}"
+                                    Minimum="{Binding Minimum}"
+                                    Maximum="{Binding Maximum}"
+                                    Style="{StaticResource MaterialDesignDiscreteSlider}"
+                                    materialDesign:SliderAssist.OnlyShowFocusVisualWhileDragging="True"
+                                    VerticalAlignment="Center"
+                                    IsSnapToTickEnabled="True" />
+                                <TextBox
+                                    Width="30"
+                                    Margin="4 0 0 0"
+                                    Text="{Binding Value}"
+                                    helpers:TextBoxHelper.OnlyNumeric="Int" />
+                                <Button
+                                    Margin="6 0 0 0"
+                                    ToolTip="Reset to default"
+                                    Style="{StaticResource MaterialDesignIconButton}"
+                                    HorizontalAlignment="Center"
+                                    Width="24"
+                                    Height="24"
+                                    Command="{Binding SetDefaultValue}">
+                                    <materialDesign:PackIcon Kind="BackupRestore" />
+                                </Button>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </GroupBox>
         </StackPanel>
     </ScrollViewer>
