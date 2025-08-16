@@ -1571,6 +1571,21 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (standAloneOverlay.WindowStyle != WindowStyle.None || standAloneOverlay.AllowsTransparency == false)
             throw new Exception("Stand-alone FlyleafHost requires WindowStyle = WindowStyle.None and AllowsTransparency = true");
 
+        var source = PresentationSource.FromVisual(standAloneOverlay);
+        if (source != null)
+        {
+            DpiX = source.CompositionTarget.TransformToDevice.M11;
+            DpiY = source.CompositionTarget.TransformToDevice.M22;
+            DpiXSource = DpiX * 96;
+            DpiYSource = DpiY * 96;
+        }
+        else // should never hit this?*
+        {
+            (DpiX, DpiY) = GetDpiAtPoint(new((int)standAloneOverlay.Left, (int)standAloneOverlay.Top));
+            DpiXSource = DpiX * 96;
+            DpiYSource = DpiY * 96;
+        }
+
         SetSurface();
         Overlay = standAloneOverlay;
         Overlay.IsVisibleChanged += OverlayStandAlone_IsVisibleChanged;
@@ -2148,10 +2163,6 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
     }
     public virtual void Detach()
     {
-        /* TODO
-         * Restoring to rectDetachedLast does not take count the DPI changes (also needs to calculate/check the DPI at that point before detaching)
-         */
-
         if (IsFullScreen)
             IsFullScreen = false;
 
@@ -2168,10 +2179,18 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         // Calculate Position
         Point newPos;
         if (DetachedRememberPosition && rectDetachedLast != Rect.Empty)
+        {
             newPos = new Point(rectDetachedLast.X, rectDetachedLast.Y);
+            (DpiX, DpiY) = GetDpiAtPoint(new((int)rectDetachedLast.X, (int)rectDetachedLast.Y));
+            DpiXSource = DpiX * 96;
+            DpiYSource = DpiY * 96;
+        }
         else
         {
             var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Surface.Top, (int)Surface.Left)).Bounds;
+            (DpiX, DpiY) = GetDpiAtPoint(new((int)Surface.Top, (int)Surface.Left));
+            DpiXSource = DpiX * 96;
+            DpiYSource = DpiY * 96;
 
             // Drop Dpi to work with screen (no Dpi)
             newSize.Width   *= DpiX;
