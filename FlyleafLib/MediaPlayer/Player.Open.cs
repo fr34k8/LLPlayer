@@ -209,7 +209,7 @@ unsafe partial class Player
                 if (Config.Player.AutoPlay)
                     Play();
             }
-            else if (!defaultVideo && !defaultAudio)
+            else if (!defaultVideo && !defaultAudio && MainDemuxer != null)
             {
                 isLive  = MainDemuxer.IsLive;
                 duration= MainDemuxer.Duration;
