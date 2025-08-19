@@ -27,6 +27,12 @@
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
 
+        <ObjectDataProvider x:Key="DeInterlaceEnum" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="flyleaf:DeInterlace"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+
         <ObjectDataProvider x:Key="HDRtoSDRMethodEnum" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
             <ObjectDataProvider.MethodParameters>
                 <x:Type TypeName="flyleaf:HDRtoSDRMethod"/>
@@ -80,8 +86,10 @@
                         <TextBlock
                             Width="180"
                             Text="Deinterlace" />
-                        <ToggleButton
-                            IsChecked="{Binding FL.PlayerConfig.Video.Deinterlace}" />
+                        <ComboBox
+                            Width="100"
+                            ItemsSource="{Binding Source={StaticResource DeInterlaceEnum}}"
+                            SelectedItem="{Binding FL.PlayerConfig.Video.DeInterlace}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
