@@ -465,8 +465,8 @@ unsafe partial class Player
 
             if (aFrame != null)
             {
-                curAudioDeviceDelay = Audio.GetDeviceDelay();
-                audioBufferedDuration = Audio.GetBufferedDuration();
+                curAudioDeviceDelay     = Audio.GetDeviceDelay();
+                audioBufferedDuration   = Audio.GetBufferedDuration();
                 aDistanceMs = (int) ((((aFrame.timestamp - startTicks) / speed) - (elapsedTicks - curAudioDeviceDelay)) / 10000);
 
                 // Try to keep the audio buffer full enough to avoid audio crackling (up to 50ms)
