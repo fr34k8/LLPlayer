@@ -20,6 +20,7 @@ public abstract unsafe class DecoderBase : RunThreadBase
     protected double speed = 1, oldSpeed = 1;
     protected virtual void OnSpeedChanged(double value) { }
 
+    internal bool               codecChanged;
     internal bool               filledFromCodec;
     protected AVFrame*          frame;
     protected AVCodecContext*   codecCtx;
@@ -115,7 +116,7 @@ public abstract unsafe class DecoderBase : RunThreadBase
                             AVDictionaryEntry *t = null;
 
                             while ((t = av_dict_get(avopt, "", t, DictReadFlags.IgnoreSuffix)) != null)
-                                Log.Debug($"Ignoring codec option {Utils.BytePtrToStringUTF8(t->key)}");
+                                Log.Debug($"Ignoring codec option {BytePtrToStringUTF8(t->key)}");
                         }
 
                         av_dict_free(&avopt);

@@ -1,5 +1,4 @@
-﻿using System.Collections.ObjectModel;
-using FlyleafLib.MediaFramework.MediaContext;
+﻿using FlyleafLib.MediaFramework.MediaContext;
 using FlyleafLib.MediaFramework.MediaStream;
 using System.ComponentModel;
 using System.Diagnostics;

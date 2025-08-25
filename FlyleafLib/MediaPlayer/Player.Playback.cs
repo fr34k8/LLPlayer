@@ -1,14 +1,9 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
-using static FlyleafLib.Utils;
-using static FlyleafLib.Logger;
 
 namespace FlyleafLib.MediaPlayer;
 
