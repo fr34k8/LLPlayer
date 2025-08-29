@@ -99,7 +99,8 @@ partial class Player
                     sFrames[i] = null;
                 }
 
-                renderer.CurFieldType = renderer.FieldType;
+                if (renderer.FieldType != Vortice.Direct3D11.VideoFrameFormat.Progressive)
+                    renderer.SetFieldType(renderer.FieldType);
 
                 if (Status == Status.Stopped)
                     decoder?.Initialize();
