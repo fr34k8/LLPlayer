@@ -688,7 +688,7 @@ public static partial class Utils
     private static partial Regex RxNonAlphaNumeric();
 
     #region Temp Transfer (v4)
-#nullable enable
+    #nullable enable
     static string metaSpaces = new(' ',"[Metadata] ".Length);
     public static string GetDumpMetadata(Dictionary<string, string>? metadata, string? exclude = null)
     {
@@ -793,7 +793,7 @@ public static partial class Utils
         av_free(t1);
         return ret;
     }
-#nullable restore
+    #nullable disable
     #endregion
 
     public static string TruncateString(string str, int maxLength, string suffix = "...")
