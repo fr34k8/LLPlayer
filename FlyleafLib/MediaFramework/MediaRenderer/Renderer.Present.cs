@@ -1,6 +1,7 @@
 ﻿using SharpGen.Runtime;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
+using Vortice.Mathematics;
 
 using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
@@ -147,13 +148,15 @@ public unsafe partial class Renderer
 
             if (overlayTexture != null)
             {
+                Viewport view = GetViewport;
+
                 // Don't stretch the overlay (reduce height based on ratiox) | Sub's stream size might be different from video size (fix y based on percentage)
-                var ratiox = (double)GetViewport.Width / overlayTextureOriginalWidth;
+                var ratiox = (double)view.Width / overlayTextureOriginalWidth;
                 var ratioy = (double)overlayTextureOriginalPosY / overlayTextureOriginalHeight;
 
                 context.OMSetBlendState(blendStateAlpha);
                 context.PSSetShaderResources(0, overlayTextureSRVs);
-                context.RSSetViewport((float) (GetViewport.X + (overlayTextureOriginalPosX * ratiox)), (float) (GetViewport.Y + (GetViewport.Height * ratioy)), (float) (overlayTexture.Description.Width * ratiox), (float) (overlayTexture.Description.Height * ratiox));
+                context.RSSetViewport((float) (view.X + (overlayTextureOriginalPosX * ratiox)), (float) (view.Y + (view.Height * ratioy)), (float) (overlayTexture.Description.Width * ratiox), (float) (overlayTexture.Description.Height * ratiox));
                 context.PSSetShader(ShaderBGRA);
                 context.Draw(6, 0);
 

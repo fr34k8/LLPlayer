@@ -21,12 +21,6 @@
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
 
-        <ObjectDataProvider x:Key="ZeroCopyEnum" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
-            <ObjectDataProvider.MethodParameters>
-                <x:Type TypeName="flyleaf:ZeroCopy"/>
-            </ObjectDataProvider.MethodParameters>
-        </ObjectDataProvider>
-
         <ObjectDataProvider x:Key="DeInterlaceEnum" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
             <ObjectDataProvider.MethodParameters>
                 <x:Type TypeName="flyleaf:DeInterlace"/>
@@ -122,16 +116,6 @@
                             Width="100"
                             ItemsSource="{Binding Source={StaticResource VideoProcessorEnum}}"
                             SelectedItem="{Binding FL.PlayerConfig.Video.VideoProcessor}" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock
-                            Width="180"
-                            Text="Zero Copy" />
-                        <ComboBox
-                            Width="100"
-                            ItemsSource="{Binding Source={StaticResource ZeroCopyEnum}}"
-                            SelectedItem="{Binding FL.PlayerConfig.Decoder.ZeroCopy}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">

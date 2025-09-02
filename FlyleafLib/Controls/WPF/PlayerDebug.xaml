@@ -292,11 +292,6 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource TextInfo}" Text="ZeroCopy"/>
-                    <TextBlock Style="{StaticResource TextValue}" Text="{Binding Player.Video.ZeroCopy}"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource TextInfo}" Text="VideoAcceleration"/>
                     <TextBlock Style="{StaticResource TextValue}" Text="{Binding Player.Video.VideoAcceleration}"/>
                 </StackPanel>
