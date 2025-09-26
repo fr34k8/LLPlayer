@@ -74,7 +74,7 @@ unsafe partial class Player
         {
             IsLive  = IsLive;
             CanPlay = CanPlay;
-            Duration=Duration;
+            Duration= Duration;
         });
         UIAll();
     }
@@ -89,7 +89,7 @@ unsafe partial class Player
         {
             IsLive  = IsLive;
             CanPlay = CanPlay;
-            Duration=Duration;
+            Duration= Duration;
         });
         UIAll();
     }
@@ -209,14 +209,14 @@ unsafe partial class Player
                 UIAdd(() =>
                 {
                     IsLive  = IsLive;
-                    Duration=Duration;
+                    Duration= Duration;
                 });
             }
 
             UIAdd(() =>
             {
-                LastError=LastError;
-                Status  = Status;
+                LastError   = LastError;
+                Status      = Status;
             });
 
             UIAll();
@@ -358,8 +358,8 @@ unsafe partial class Player
 
             UIAdd(() =>
             {
-                LastError=LastError;
-                Status  = Status;
+                LastError   = LastError;
+                Status      = Status;
             });
 
             UIAll();
@@ -422,14 +422,14 @@ unsafe partial class Player
                 UIAdd(() =>
                 {
                     IsLive  = IsLive;
-                    Duration=Duration;
+                    Duration= Duration;
                 });
             }
 
             UIAdd(() =>
             {
-                LastError=LastError;
-                Status  = Status;
+                LastError   = LastError;
+                Status      = Status;
             });
 
             UIAll();
@@ -626,13 +626,13 @@ unsafe partial class Player
                 args = decoder.OpenDataStream(dstream);
             }
 
-            if (resync)
+            if (resync && (Duration > 0 || stream.Demuxer.IsHLSLive))
             {
                 // Wait for at least on package before seek to update the HLS context first_time
                 if (stream.Demuxer.IsHLSLive)
                 {
                     while (stream.Demuxer.IsRunning && stream.Demuxer.GetPacketsPtr(stream).Count < 3)
-                        System.Threading.Thread.Sleep(20);
+                        Thread.Sleep(20);
 
                     ReSync(stream, (int) ((Duration - fromEnd - (DateTime.UtcNow.Ticks - delay))/ 10000));
                 }
@@ -727,14 +727,14 @@ unsafe partial class Player
 
         if (stream.Demuxer.Type == MediaType.Video)
         {
-            isVideoSwitch = true;
-            isAudioSwitch = true;
+            isVideoSwitch       = true;
+            isAudioSwitch       = true;
             for (int i = 0; i < subNum; i++)
             {
                 isSubsSwitches[i] = true;
             }
-            isDataSwitch = true;
-            requiresBuffering = true;
+            isDataSwitch        = true;
+            requiresBuffering   = true;
 
             if (accurate && Video.IsOpened)
             {
@@ -745,16 +745,16 @@ unsafe partial class Player
             else
                 decoder.Seek(syncMs, false, false);
 
-            aFrame = null;
-            isAudioSwitch = false;
-            isVideoSwitch = false;
+            aFrame          = null;
+            isAudioSwitch   = false;
+            isVideoSwitch   = false;
             for (int i = 0; i < subNum; i++)
             {
                 sFrames[i] = sFramesPrev[i] = null;
                 isSubsSwitches[i] = false;
             }
             dFrame = null;
-            isDataSwitch = false;
+            isDataSwitch    = false;
 
             if (!IsPlaying)
             {
