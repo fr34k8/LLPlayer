@@ -84,6 +84,7 @@ unsafe partial class Player
             return;
 
         renderer.Present(vFrame);
+        Video.framesDisplayed++;
 
         if (!seeks.IsEmpty)
             return;
