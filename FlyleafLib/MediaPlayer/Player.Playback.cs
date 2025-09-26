@@ -70,6 +70,8 @@ partial class Player
                     ScreamerAudioOnly();
                 else
                 {
+                    if (Config.Player.ZeroLatency)
+                        ScreamerZeroLatency();
                     if (ReversePlayback)
                     {
                         shouldFlushNext = true;
