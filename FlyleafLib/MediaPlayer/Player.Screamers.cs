@@ -1,9 +1,10 @@
-﻿using FlyleafLib.MediaFramework.MediaDecoder;
+﻿﻿using System.Diagnostics;
+
+using Vortice.Direct3D11;
+
+using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
 using FlyleafLib.MediaFramework.MediaStream;
-using System.Diagnostics;
-using System.Text;
-using Vortice.Direct3D11;
 
 namespace FlyleafLib.MediaPlayer;
 
