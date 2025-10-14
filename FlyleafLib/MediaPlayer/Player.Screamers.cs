@@ -1,10 +1,7 @@
 ﻿﻿using System.Diagnostics;
 
-using Vortice.Direct3D11;
-
 using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaFrame;
-using FlyleafLib.MediaFramework.MediaStream;
 
 namespace FlyleafLib.MediaPlayer;
 
@@ -40,10 +37,10 @@ unsafe partial class Player
     {
         if (onBufferingStarted - 1 != onBufferingCompleted) return;
 
-        if (error != null && LastError == null)
+        if (error != null && lastError == null)
         {
             lastError = error;
-            UI(() => LastError = LastError);
+            UI(() => LastError = lastError);
         }
 
         BufferingCompleted?.Invoke(this, new BufferingCompletedArgs(error));
@@ -78,7 +75,7 @@ unsafe partial class Player
         {
             sFrames[i] = null;
         }
-        if (VideoDecoder.Frames.IsEmpty || !VideoDecoder.Frames.TryDequeue(out vFrame))
+        if (!VideoDecoder.Frames.TryDequeue(out vFrame))
             return;
 
         renderer.RenderRequest(vFrame);
@@ -144,7 +141,7 @@ unsafe partial class Player
             Thread.Sleep(20);
     }
     private void ScreamerAudioOnly()
-    {
+    {   // TODO: Needs Recoding (old code)
         long bufferedDuration = 0;
 
         while (IsPlaying)
@@ -239,11 +236,15 @@ unsafe partial class Player
     }
 
     private void ScreamerReverse()
-    {
+    {   // TBR: Timings / Rebuffer
         while (status == Status.Playing)
         {
             if (seeks.TryPop(out var seekData))
             {
+                if (vFrame != null)
+                    { VideoDecoder.DisposeFrame(vFrame); vFrame = null; } // should never be LastFrame
+                renderer.RenderPlayStop();
+
                 seeks.Clear();
                 if (decoder.Seek(seekData.ms, seekData.forward) < 0)
                     Log.Warn("Seek failed");
@@ -254,6 +255,7 @@ unsafe partial class Player
                 if (VideoDecoder.Status == MediaFramework.Status.Ended)
                     break;
 
+                renderer.RenderPlayStop();
                 OnBufferingStarted();
                 if (reversePlaybackResync)
                 {
@@ -264,41 +266,38 @@ unsafe partial class Player
                 VideoDemuxer.Start();
                 VideoDecoder.Start();
 
+                // Recoding*
                 while (VideoDecoder.Frames.IsEmpty && status == Status.Playing && VideoDecoder.IsRunning) Thread.Sleep(15);
                 OnBufferingCompleted();
-                VideoDecoder.Frames.TryDequeue(out vFrame);
-                if (vFrame == null) { Log.Warn("No video frame"); break; }
-                vFrame.timestamp = (long) (vFrame.timestamp / Speed);
+                if (!VideoDecoder.Frames.TryDequeue(out vFrame))
+                    { Log.Warn("No video frame"); break; }
 
                 startTicks = vFrame.timestamp;
-                sw.Restart();
                 UpdateCurTime(vFrame.timestamp, false);
+                renderer.RenderPlayStart();
+                sw.Restart();
             }
 
-            elapsedTicks    = startTicks - (long) (sw.ElapsedTicks * SWFREQ_TO_TICKS);
-            vDistanceMs     = (int) ((elapsedTicks - vFrame.timestamp) / 10000);
+            elapsedTicks    = (long)(sw.ElapsedTicks * SWFREQ_TO_TICKS);
+            vDistanceMs     = (int) ((((startTicks - vFrame.timestamp) / speed) - elapsedTicks) / 10000);
             sleepMs         = vDistanceMs - 1;
 
             if (sleepMs < 0) sleepMs = 0;
 
             if (Math.Abs(vDistanceMs - sleepMs) > 5)
             {
-                //Log($"vDistanceMs |-> {vDistanceMs}");
-                VideoDecoder.DisposeFrame(vFrame);
-                vFrame = null;
+                VideoDecoder.DisposeFrame(vFrame); vFrame = null; // should never be LastFrame
                 Thread.Sleep(5);
                 continue; // rebuffer
             }
 
             if (sleepMs > 2)
             {
-                if (sleepMs > 1000)
+                if (sleepMs > 2000)
                 {
-                    //Log($"sleepMs -> {sleepMs} , vDistanceMs |-> {vDistanceMs}");
-                    VideoDecoder.DisposeFrame(vFrame);
-                    vFrame = null;
+                    VideoDecoder.DisposeFrame(vFrame); vFrame = null; // should never be LastFrame
                     Thread.Sleep(5);
-                    continue; // rebuffer
+                    continue;
                 }
 
                 Thread.Sleep(sleepMs);
@@ -309,22 +308,24 @@ unsafe partial class Player
 
             UpdateCurTime(vFrame.timestamp, false);
 
-            VideoDecoder.Frames.TryDequeue(out vFrame);
-            if (vFrame != null)
-                vFrame.timestamp = (long) (vFrame.timestamp / Speed);
+            vFrame = null;
+            int dequeueRetries  = MAX_DEQUEUE_RETRIES;
+            while (!isVideoSwitch && !VideoDecoder.Frames.TryDequeue(out vFrame) && dequeueRetries-- > 0)
+                Thread.Sleep(1);
         }
+        if (vFrame != null)
+            { VideoDecoder.DisposeFrame(vFrame); vFrame = null; } // should never be LastFrame
+        if (CanInfo) Log.Info($"Finished at {TicksToTimeMini(curTime)}");
     }
 
     private void ScreamerZeroLatency()
-    {
-        // Video Only | IsLive | No Deinterlacing | No Frame Stepping | No Bitrate Stats | No Buffered Duration | Frame rate = receiving packets rate
-
-
+    {   // Video Only | IsLive | No Deinterlacing | No Frame Stepping | No Bitrate Stats | No Buffered Duration | Frame rate = receiving packets rate
         VideoDemuxer.Pause();
         VideoDecoder.Pause();
         VideoDemuxer.DisposePackets();
         VideoDecoder.Flush();
 
+        renderer.RenderPlayStart();
         while (status == Status.Playing)
         {
             vFrame = VideoDecoder.GetFrameNext();
@@ -337,7 +338,10 @@ unsafe partial class Player
             UpdateCurTime(vFrame.timestamp, false);
         }
 
-        if (CanInfo) Log.Info($"Finished -> {TicksToTime(CurTime)}");
+        vFrame = null;
+        renderer.RenderPlayStop();
+
+        if (CanInfo) Log.Info($"Finished at {TicksToTimeMini(curTime)}");
     }
 }
 
