@@ -504,6 +504,8 @@ public unsafe partial class Player : NotifyPropertyChanged, IDisposable
     volatile bool isAudioSwitch;
     volatile bool[] isSubsSwitches;
     volatile bool isDataSwitch;
+
+    public int subNum => Config.Subtitles.Max;
     #endregion
 
     public Player(Config config = null)
@@ -569,7 +571,6 @@ public unsafe partial class Player : NotifyPropertyChanged, IDisposable
         decoder.OpenExternalVideoStreamCompleted       += Decoder_OpenExternalVideoStreamCompleted;
         decoder.OpenExternalSubtitlesStreamCompleted   += Decoder_OpenExternalSubtitlesStreamCompleted;
 
-        //AudioDecoder.CBufAlloc      = () => { if (aFrame != null) aFrame.dataPtr = IntPtr.Zero; aFrame = null; Audio.ClearBuffer(); aFrame = null; };
         AudioDecoder.CodecChanged   = Decoder_AudioCodecChanged;
         VideoDecoder.CodecChanged   = Decoder_VideoCodecChanged;
         decoder.RecordingCompleted += (o, e) => { IsRecording = false; };
@@ -578,7 +579,6 @@ public unsafe partial class Player : NotifyPropertyChanged, IDisposable
         // second subtitles
         sFrames = new SubtitlesFrame[subNum];
         sFramesPrev = new SubtitlesFrame[subNum];
-        sDistanceMss = new int[subNum];
         isSubsSwitches = new bool[subNum];
 
         status = Status.Stopped;
