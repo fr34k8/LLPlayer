@@ -94,6 +94,11 @@ partial class Player
                     shouldFlushPrev = true;
                     ScreamerVASD();
                 }
+
+                if (vFrame != renderer.LastFrame) // Audio does not have renderer
+                    VideoDecoder.DisposeFrame(vFrame);
+
+                vFrame = null;
             }
 
         }
@@ -104,9 +109,6 @@ partial class Player
         }
         finally
         {
-            if (vFrame != renderer.LastFrame)
-                VideoDecoder.DisposeFrame(vFrame);
-            vFrame = null;
             for (int i = 0; i < subNum; i++)
             {
                 sFrames[i] = null;
