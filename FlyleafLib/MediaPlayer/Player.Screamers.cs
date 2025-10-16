@@ -59,7 +59,7 @@ unsafe partial class Player
         {
             sFrames[i] = null;
         }
-        if (!VideoDecoder.Frames.TryDequeue(out vFrame))
+        if (!vFrames.TryDequeue(out vFrame))
             return;
 
         renderer.RenderRequest(vFrame);
@@ -255,9 +255,9 @@ unsafe partial class Player
                 VideoDecoder.Start();
 
                 // Recoding*
-                while (VideoDecoder.Frames.IsEmpty && status == Status.Playing && VideoDecoder.IsRunning) Thread.Sleep(15);
+                while (vFrames.IsEmpty && status == Status.Playing && VideoDecoder.IsRunning) Thread.Sleep(15);
                 OnBufferingCompleted();
-                if (!VideoDecoder.Frames.TryDequeue(out vFrame))
+                if (!vFrames.TryDequeue(out vFrame))
                     { Log.Warn("No video frame"); break; }
 
                 startTicks = vFrame.timestamp;
@@ -298,7 +298,7 @@ unsafe partial class Player
 
             vFrame = null;
             int dequeueRetries  = MAX_DEQUEUE_RETRIES;
-            while (!isVideoSwitch && !VideoDecoder.Frames.TryDequeue(out vFrame) && dequeueRetries-- > 0)
+            while (!isVideoSwitch && !vFrames.TryDequeue(out vFrame) && dequeueRetries-- > 0)
                 Thread.Sleep(1);
         }
         if (vFrame != null)
