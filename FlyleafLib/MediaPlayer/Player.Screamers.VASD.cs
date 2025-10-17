@@ -78,7 +78,8 @@ unsafe partial class Player
             }
         }
 
-        VideoDecoder.DisposeFrame(vFrame); // TBR: Should never be not null (check with LastFrame?)
+        if (vFrame != null && vFrame != renderer.LastFrame) // TBR: lock?
+            VideoDecoder.DisposeFrame(vFrame);
         vFrame = null; aFrame = null; dFrame = null;
         for (int i = 0; i < subNum; i++)
         {
