@@ -161,6 +161,15 @@ public class MainWindowVM : Bindable
         {
             FL.Player.OpenAsync(App.CmdUrl);
         }
+
+        if (Engine.Config.FFmpegLoadProfile == Flyleaf.FFmpeg.LoadProfile.All)
+        {
+            Task.Run(() =>
+            {
+                Engine.Video.RefreshCapDevices();
+                Engine.Audio.RefreshCapDevices();
+            });
+        }
     });
 
     public DelegateCommand? CmdOnClosing => field ??= new(() =>
