@@ -62,9 +62,6 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     CornerRadius cornerRadius = new(0);
     CornerRadius zeroCornerRadius = new(0);
 
-    public bool             IsHDR           { get => isHDR;         private set { SetUI(ref _IsHDR, value); isHDR = value; } }
-    bool _IsHDR, isHDR;
-
     public int              SideXPixels     { get; private set; }
     public int              SideYPixels     { get; private set; }
 
@@ -186,6 +183,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
     public RawRect          VideoRect       { get; set; }
 
     LogHandler Log;
+    bool use2d;
 
     public Renderer(VideoDecoder videoDecoder, IntPtr handle = new IntPtr(), int uniqueId = -1)
     {
@@ -193,6 +191,7 @@ public partial class Renderer : NotifyPropertyChanged, IDisposable
         VideoDecoder= videoDecoder;
         Config      = videoDecoder.Config;
         Log         = new LogHandler(("[#" + UniqueId + "]").PadRight(8, ' ') + " [Renderer      ] ");
+        use2d       = Config.Video.Use2DGraphics;
 
         overlayTextureDesc = new()
         {

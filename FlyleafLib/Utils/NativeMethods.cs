@@ -1,10 +1,8 @@
-﻿using System;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Runtime.InteropServices;
 
 namespace FlyleafLib;
 
-#pragma warning disable CA1401 // P/Invokes should not be visible
 public static partial class Utils
 {
     public static class NativeMethods
@@ -21,8 +19,6 @@ public static partial class Utils
                 GetWindowLong = GetWindowLongPtr64;
                 SetWindowLong = SetWindowLongPtr64;
             }
-
-            GetDPI(out DpiX, out DpiY);
         }
 
         public static Func<IntPtr, int, IntPtr, IntPtr> SetWindowLong;
@@ -257,24 +253,28 @@ public static partial class Utils
         public static int SignedLOWORD(int n) => (short)(n & 0xFFFF);
 
         #region DPI
-        public static double DpiX, DpiY;
-        public static int DpiXSource, DpiYSource;
-        const int LOGPIXELSX = 88, LOGPIXELSY = 90;
-        [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true, ExactSpelling = true)]
-        public static extern int GetDeviceCaps(IntPtr hDC, int nIndex);
-        public static void GetDPI(out double dpiX, out double dpiY) => GetDPI(IntPtr.Zero, out dpiX, out dpiY);
-        public static void GetDPI(IntPtr handle, out double dpiX, out double dpiY)
+        public static double DpiX = 0, DpiY = 0;
+        public static double DpiXSource = 96, DpiYSource = 96;
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromPoint(Point pt, uint dwFlags);
+
+        [DllImport("shcore.dll")]
+        public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+        private const int MONITOR_DEFAULTTONEAREST = 2;
+        private const int MDT_EFFECTIVE_DPI = 0;
+        public static (double dpiX, double dpiY) GetDpiAtPoint(Point point)
         {
-            Graphics GraphicsObject = Graphics.FromHwnd(handle); // DESKTOP Handle
-            IntPtr dcHandle = GraphicsObject.GetHdc();
-            DpiXSource = GetDeviceCaps(dcHandle, LOGPIXELSX);
-            dpiX = DpiXSource / 96.0;
-            DpiYSource = GetDeviceCaps(dcHandle, LOGPIXELSY);
-            dpiY = DpiYSource / 96.0;
-            GraphicsObject.ReleaseHdc(dcHandle);
-            GraphicsObject.Dispose();
+            IntPtr monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+
+            if (monitor != IntPtr.Zero && GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY) == 0)
+                return (dpiX / 96.0, dpiY / 96.0);
+
+            // Fallback to primary monitor DPI
+            using var g = Graphics.FromHwnd(IntPtr.Zero);
+            return (g.DpiX / 96.0, g.DpiY / 96.0);
         }
         #endregion
     }
 }
-#pragma warning restore CA1401 // P/Invokes should not be visible

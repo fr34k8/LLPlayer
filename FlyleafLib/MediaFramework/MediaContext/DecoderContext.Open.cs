@@ -272,16 +272,14 @@ public partial class DecoderContext
         {
             Initialize();
 
-            if (input is Stream)
-            {
-                Playlist.IOStream = (Stream)input;
-            }
+            if (input is Stream iostream)
+                Playlist.IOStream = iostream;
             else
                 Playlist.Url = input.ToString(); // TBR: check UI update
 
-            args.Url = Playlist.Url;
-            args.IOStream = Playlist.IOStream;
-            args.Error = Open().Error;
+            args.Url        = Playlist.Url;
+            args.IOStream   = Playlist.IOStream;
+            args.Error      = Open().Error;
 
             if (Playlist.Items.Count == 0 && args.Success)
                 args.Error = "No playlist items were found";
@@ -482,9 +480,9 @@ public partial class DecoderContext
             }
 
             if (Config.Data.Enabled)
-            {
                 OpenSuggestedData();
-            }
+
+            MainDemuxer ??= VideoDemuxer;
 
             LoadPlaylistChapters();
 
@@ -667,7 +665,7 @@ public partial class DecoderContext
                     else if (stream.Type == MediaType.Subs)
                     {
                         int i = SubtitlesSelectedHelper.CurIndex;
-                        if (!EnableDecoding) 
+                        if (!EnableDecoding)
                            SubtitlesDemuxers[i].Dispose();
 
                         if (Playlist.Selected.ExternalSubtitlesStreams[i] != null)

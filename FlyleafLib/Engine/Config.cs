@@ -220,7 +220,7 @@ public class Config : NotifyPropertyChanged
     public DataConfig       Data        { get; set; } = new();
 
     public Dictionary<string, ObservableDictionary<string, string>>
-                            Plugins     { get; set; } = new();
+                            Plugins     { get; set; } = [];
     private
            Dictionary<string, ObservableDictionary<string, string>>
                             defaultPlugins;
@@ -399,7 +399,7 @@ public class Config : NotifyPropertyChanged
         public bool     SeekOffsetAccurate4         { get; set; } = false;
         public double   SpeedOffset                 { get; set; } = 0.10;
         public double   SpeedOffset2                { get; set; } = 0.25;
-        public int      ZoomOffset                  { get => _ZoomOffset; set { if (Set(ref _ZoomOffset, value)) player?.ResetAll(); } }
+        public int      ZoomOffset                  { get => _ZoomOffset; set { if (SetUI(ref _ZoomOffset, value)) player?.ResetAll(); } }
         int _ZoomOffset = 10;
 
         public int      VolumeOffset                { get; set; } = 5;
@@ -410,9 +410,9 @@ public class Config : NotifyPropertyChanged
         {
             DemuxerConfig demuxer = (DemuxerConfig) MemberwiseClone();
 
-            demuxer.FormatOpt       = new Dictionary<string, string>();
-            demuxer.AudioFormatOpt  = new Dictionary<string, string>();
-            demuxer.SubtitlesFormatOpt = new Dictionary<string, string>();
+            demuxer.FormatOpt           = [];
+            demuxer.AudioFormatOpt      = [];
+            demuxer.SubtitlesFormatOpt  = [];
 
             foreach (var kv in FormatOpt) demuxer.FormatOpt.Add(kv.Key, kv.Value);
             foreach (var kv in AudioFormatOpt) demuxer.AudioFormatOpt.Add(kv.Key, kv.Value);
@@ -450,7 +450,7 @@ public class Config : NotifyPropertyChanged
         /// <summary>
         /// List of FFmpeg formats to be excluded from interrupts
         /// </summary>
-        public List<string>     ExcludeInterruptFmts{ get; set; } = new List<string>() { "rtsp" };
+        public List<string>     ExcludeInterruptFmts{ get; set; } = ["rtsp"];
 
         /// <summary>
         /// Maximum allowed duration ticks for buffering
@@ -555,7 +555,7 @@ public class Config : NotifyPropertyChanged
         /// </summary>
         public Dictionary<string, string>
                                 ExtraHTTPQueryParamsToUnderlying
-                                                { get; set; } = new();
+                                                { get; set; } = [];
 
         /// <summary>
         /// FFmpeg's format options for demuxer
@@ -815,10 +815,10 @@ public class Config : NotifyPropertyChanged
         HDRtoSDRMethod _HDRtoSDRMethod = HDRtoSDRMethod.Hable;
 
         /// <summary>
-        /// The HDR to SDR Tone float correnction (not used by Reinhard)
+        /// SDR Display Peak Luminance (will be used for HDR to SDR conversion)
         /// </summary>
-        public unsafe float     HDRtoSDRTone                { get => _HDRtoSDRTone; set { if (Set(ref _HDRtoSDRTone, value) && player != null && player.VideoDecoder.VideoStream != null && player.VideoDecoder.VideoStream.ColorSpace == ColorSpace.BT2020) player.renderer.UpdateHDRtoSDR(); } }
-        float _HDRtoSDRTone = 1.4f;
+        public unsafe float     SDRDisplayNits              { get => _SDRDisplayNits; set { if (Set(ref _SDRDisplayNits, value) && player != null && player.VideoDecoder.VideoStream != null && player.VideoDecoder.VideoStream.ColorSpace == ColorSpace.BT2020) player.renderer.UpdateHDRtoSDR(); } }
+        float _SDRDisplayNits = 200f; // TODO: Retrieve this through Vortice (output6) but currently not supported
 
         /// <summary>
         /// Whether the renderer will use 10-bit swap chaing or 8-bit output
@@ -838,11 +838,29 @@ public class Config : NotifyPropertyChanged
         /// </summary>
         public bool             SwapForceR8G8B8A8           { get; set; }
 
-        public Dictionary<VideoFilters, VideoFilter> Filters {get ; set; } = DefaultFilters();
+        /// <summary>
+        /// Enables custom Direct2D drawing over playback frames
+        /// </summary>
+        public bool             Use2DGraphics               { get; set; }
+
+        public event EventHandler<Vortice.Direct2D1.ID2D1DeviceContext> D2DInitialized;
+        public event EventHandler<Vortice.Direct2D1.ID2D1DeviceContext> D2DDisposing;
+        public event EventHandler<Vortice.Direct2D1.ID2D1DeviceContext> D2DDraw;
+
+        internal void OnD2DInitialized(Renderer renderer, Vortice.Direct2D1.ID2D1DeviceContext context)
+            => D2DInitialized?.Invoke(renderer, context);
+
+        internal void OnD2DDisposing(Renderer renderer, Vortice.Direct2D1.ID2D1DeviceContext context)
+            => D2DDisposing?.Invoke(renderer, context);
+
+        internal void OnD2DDraw(Renderer renderer, Vortice.Direct2D1.ID2D1DeviceContext context)
+            => D2DDraw?.Invoke(renderer, context);
+
+        public Dictionary<VideoFilters, VideoFilter> Filters { get ; set; } = DefaultFilters();
 
         public static Dictionary<VideoFilters, VideoFilter> DefaultFilters()
         {
-            Dictionary<VideoFilters, VideoFilter> filters = new();
+            Dictionary<VideoFilters, VideoFilter> filters = [];
 
             var available = Enum.GetValues(typeof(VideoFilters));
 
@@ -1014,10 +1032,9 @@ public class Config : NotifyPropertyChanged
 
         public SubtitlesConfig Clone()
         {
-            SubtitlesConfig subs = new();
-            subs = (SubtitlesConfig) MemberwiseClone();
+            SubtitlesConfig subs = (SubtitlesConfig) MemberwiseClone();
 
-            subs.Languages = new List<Language>();
+            subs.Languages = [];
             if (Languages != null) foreach(var lang in Languages) subs.Languages.Add(lang);
 
             subs.player = null;
@@ -1301,8 +1318,7 @@ public class Config : NotifyPropertyChanged
     {
         public DataConfig Clone()
         {
-            DataConfig data = new();
-            data = (DataConfig)MemberwiseClone();
+            DataConfig data = (DataConfig)MemberwiseClone();
 
             data.player = null;
 
