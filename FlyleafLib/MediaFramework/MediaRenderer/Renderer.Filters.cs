@@ -202,6 +202,7 @@ class VideoFilterLocal
 
 public class FLVideoFilter : VideoFilter
 {
+    public FLVideoFilter() : base() { }
     internal FLVideoFilter(Renderer renderer,VideoFilterLocal filter) : base(renderer, filter) { }
 
     public override void UpdateValue()
@@ -224,6 +225,7 @@ public class FLVideoFilter : VideoFilter
 
 public class D3VideoFilter : VideoFilter
 {
+    public D3VideoFilter() : base() { }
     internal D3VideoFilter(Renderer renderer, VideoFilterLocal filter) : base(renderer, filter) { }
 
     public override void UpdateValue()
@@ -245,6 +247,8 @@ public class D3VideoFilter : VideoFilter
 
 public abstract class VideoFilter : NotifyPropertyChanged
 {
+    // NOTE: Don't touch public (constructor/properties) required for serialization
+
     [JsonIgnore]
     public bool         Available   => filter != null;
     internal VideoFilterLocal filter;
@@ -255,22 +259,22 @@ public abstract class VideoFilter : NotifyPropertyChanged
         RaiseUI(nameof(Available));
     }
 
-    public VideoFilters Filter      { get => _Filter;       internal set => SetUI(ref _Filter, value); }
+    public VideoFilters Filter      { get => _Filter;       set => SetUI(ref _Filter, value); }
     protected VideoFilters _Filter = VideoFilters.Brightness;
 
-    public int          Minimum     { get => _Minimum;      internal set => SetUI(ref _Minimum, value); }
+    public int          Minimum     { get => _Minimum;      set => SetUI(ref _Minimum, value); }
     protected int _Minimum = 0;
 
-    public int          Maximum     { get => _Maximum;      internal set => SetUI(ref _Maximum, value); }
+    public int          Maximum     { get => _Maximum;      set => SetUI(ref _Maximum, value); }
     protected int _Maximum = 100;
 
-    public float        Step        { get => _Step;         internal set => SetUI(ref _Step, value); }
+    public float        Step        { get => _Step;         set => SetUI(ref _Step, value); }
     protected float _Step = 1;
 
     public int          Default
     {
         get => _Default;
-        internal set
+        set
         {
             if (SetUI(ref _Default, value))
             {
@@ -310,6 +314,7 @@ public abstract class VideoFilter : NotifyPropertyChanged
 
     internal Renderer renderer;
 
+    public VideoFilter() { }
     internal VideoFilter(Renderer renderer, VideoFilterLocal filter)
     {
         this.renderer   = renderer;

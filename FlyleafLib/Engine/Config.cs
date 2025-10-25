@@ -805,7 +805,7 @@ public class Config : NotifyPropertyChanged
         /// SDR Display Peak Luminance (will be used for HDR to SDR conversion)
         /// </summary>
         public unsafe float     SDRDisplayNits              { get => _SDRDisplayNits; set { if (Set(ref _SDRDisplayNits, value) && player != null && player.VideoDecoder.VideoStream != null && player.VideoDecoder.VideoStream.ColorSpace == ColorSpace.BT2020) player.renderer.UpdateHDRtoSDR(); } }
-        float _SDRDisplayNits = Engine.Video.RecommendedLuminance;
+        float _SDRDisplayNits = Engine.Video != null ? Engine.Video.RecommendedLuminance : 200;
 
         /// <summary>
         /// Whether the renderer will use 10-bit swap chaing or 8-bit output
