@@ -1,14 +1,7 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using System.Windows.Data;
 
 using static FlyleafLib.Config;
-using static FlyleafLib.Logger;
 
 using FlyleafLib.MediaFramework.MediaProgram;
 using FlyleafLib.MediaFramework.MediaStream;
@@ -767,6 +760,12 @@ public unsafe class Demuxer : RunThreadBase
         if (fmtCtx->start_time_realtime != NoTs)
             StartRealTime = EPOCH.AddMicroseconds(fmtCtx->start_time_realtime);
 
+        if (Engine.Config.FFmpegHLSLiveSeek && Duration == 0 && Name == "hls" && Environment.Is64BitProcess) // HLSContext cast is not safe
+        {
+            hlsCtx = (HLSContext*)fmtCtx->priv_data;
+            StartTime = 0;
+        }
+
         Metadata.Clear();
         AVDictionaryEntry* b = null;
         while (true)
@@ -866,7 +865,7 @@ public unsafe class Demuxer : RunThreadBase
         Duration = fmtCtx->duration > 0 ? fmtCtx->duration * 10 : 0;
 
         // Try to fill duration when missing (not analyzed mainly) | Considers CFR
-        if (Duration == 0 && !analyzed)
+        if (Duration == 0 && !analyzed && hlsCtx == null)
         {
             foreach(var videoStream in VideoStreams)
                 if (videoStream.TotalFrames > 0 && videoStream.FrameDuration > 0)
@@ -902,14 +901,6 @@ public unsafe class Demuxer : RunThreadBase
         {
             for (int i = 0; i < fmtCtx->nb_streams; i++)
                 AVStreamToStream[i].UpdateDuration();
-        }
-
-        // TBR: Possible we can get Apple HTTP Live Streaming/hls with HLSPlaylist->finished with Duration != 0
-        if (Engine.Config.FFmpegHLSLiveSeek && Duration == 0 && Name == "hls" && Environment.Is64BitProcess) // HLSContext cast is not safe
-        {
-            hlsCtx = (HLSContext*)fmtCtx->priv_data;
-            StartTime = 0;
-            //UpdateHLSTime(); Maybe with default 0 playlist
         }
 
         IsLive = Duration == 0 || hlsCtx != null;

@@ -1,4 +1,6 @@
-﻿using FlyleafLib.MediaFramework.MediaDecoder;
+﻿using Vortice.Direct3D11;
+
+using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaFramework.MediaDemuxer;
 
 namespace FlyleafLib.MediaFramework.MediaStream;
@@ -10,14 +12,14 @@ public unsafe class VideoStream : StreamBase
      * Chroma Location (when we add support in renderer)
      */
 
-    public AspectRatio                  AspectRatio         { get; set; }
     public AVRational                   SAR                 { get; set; }
     public ColorRange                   ColorRange          { get; set; }
     public ColorSpace                   ColorSpace          { get; set; }
     public ColorType                    ColorType           { get; set; }
     public AVColorTransferCharacteristic
                                         ColorTransfer       { get; set; }
-    public DeInterlace                  FieldOrder          { get; set; }
+    public Cropping                     Cropping            { get; set; }
+    public VideoFrameFormat             FieldOrder          { get; set; }
     public double                       Rotation            { get; set; }
     public double                       FPS                 { get; set; }
     public long                         FrameDuration       { get ;set; }
@@ -36,6 +38,9 @@ public unsafe class VideoStream : StreamBase
     public int                          TotalFrames         { get; set; }
     public uint                         Width               { get; set; }
     public bool                         FixTimestamps       { get; set; }
+
+    internal CropRect cropStreamRect, cropFrameRect, cropRect; // Stream Crop + Codec Padding + Texture Padding
+    bool hasStreamCrop;
 
     public VideoStream(Demuxer demuxer, AVStream* st) : base(demuxer, st)
         => Type = MediaType.Video;
@@ -56,15 +61,9 @@ public unsafe class VideoStream : StreamBase
         if (PixelFormat != AVPixelFormat.None)
             AnalysePixelFormat();
 
-        Width           = (uint)cp->width;
-        Height          = (uint)cp->height;
-        SAR             = av_guess_sample_aspect_ratio(null, AVStream, null);
-        if (SAR.Num != 0)
-        {
-            int x, y;
-            _ = av_reduce(&x, &y, Width * SAR.Num, Height * SAR.Den, 1024 * 1024);
-            AspectRatio = new(x, y);
-        }
+        Width   = (uint)cp->width;
+        Height  = (uint)cp->height;
+        SAR     = av_guess_sample_aspect_ratio(null, AVStream, null);
 
         if (Demuxer.FormatContext->iformat->flags.HasFlag(FmtFlags.Notimestamps))
             FixTimestamps = true;
@@ -84,7 +83,7 @@ public unsafe class VideoStream : StreamBase
             TotalFrames     = (int)(Duration / FrameDuration);
         }
 
-        FieldOrder      = cp->field_order == AVFieldOrder.Tt ? DeInterlace.TopField : (cp->field_order == AVFieldOrder.Bb ? DeInterlace.BottomField : DeInterlace.Progressive);
+        FieldOrder      = cp->field_order == AVFieldOrder.Tt ? VideoFrameFormat.InterlacedTopFieldFirst : (cp->field_order == AVFieldOrder.Bb ? VideoFrameFormat.InterlacedBottomFieldFirst : VideoFrameFormat.Progressive);
         ColorTransfer   = cp->color_trc;
 
         if (cp->color_range == AVColorRange.Mpeg)
@@ -99,16 +98,33 @@ public unsafe class VideoStream : StreamBase
         else if (cp->color_space == AVColorSpace.Bt2020Ncl || cp->color_space == AVColorSpace.Bt2020Cl)
             ColorSpace = ColorSpace.Bt2020;
 
-        AVPacketSideData* pktSideData;
-        if ((pktSideData = av_packet_side_data_get(cp->coded_side_data, cp->nb_coded_side_data, AVPacketSideDataType.Displaymatrix)) != null && pktSideData->data != null)
+        if (cp->nb_coded_side_data == 0)
+            return;
+
+        var rotData = av_packet_side_data_get(cp->coded_side_data, cp->nb_coded_side_data, AVPacketSideDataType.Displaymatrix);
+        if (rotData != null && rotData->data != null)
         {
-            double rotation = -Math.Round(av_display_rotation_get((int*)pktSideData->data));
-            Rotation = rotation - (360*Math.Floor(rotation/360 + 0.9/360));
+            double rotation = -Math.Round(av_display_rotation_get((int*)rotData->data));
+            Rotation = rotation - (360 * Math.Floor(rotation / 360 + 0.9 / 360));
+        }
+
+        var cropData= av_packet_side_data_get(cp->coded_side_data, cp->nb_coded_side_data, AVPacketSideDataType.FrameCropping);
+        if (cropData != null && cropData->size == 16)
+        {
+            var cropByes = new ReadOnlySpan<byte>(cropData->data, 16).ToArray();
+            cropStreamRect = new(
+                top:    BitConverter.ToUInt32(cropByes, 0),
+                bottom: BitConverter.ToUInt32(cropByes, 4),
+                left:   BitConverter.ToUInt32(cropByes, 8),
+                right:  BitConverter.ToUInt32(cropByes, 12)
+                );
+
+            hasStreamCrop = cropStreamRect != CropRect.Empty;
         }
     }
 
     // >= Second time fill from Decoder / Frame | TBR: We could avoid re-filling it when re-enabling a stream ... when same PixelFormat (VideoAcceleration)
-    public void Refresh(VideoDecoder decoder, AVFrame* frame)
+    public void Refresh(VideoDecoder decoder, AVFrame* frame) // TBR: Can be filled multiple times from different Codecs
     {
         var codecCtx= decoder.CodecCtx;
         var format  = decoder.VideoAccelerated && codecCtx->sw_pix_fmt != AVPixelFormat.None ? codecCtx->sw_pix_fmt : codecCtx->pix_fmt;
@@ -129,27 +145,75 @@ public unsafe class VideoStream : StreamBase
         if (codecCtx->bit_rate > 0)
             BitRate = codecCtx->bit_rate; // for logging only
 
-        if (SAR.Num == 0 || decoder.codecChanged)
+        if (SAR.Num == 0)
         {
-            Width   = (uint)frame->width;
-            Height  = (uint)frame->height;
-
             if (frame->sample_aspect_ratio.Num != 0)
                 SAR = frame->sample_aspect_ratio;
             else if (codecCtx->sample_aspect_ratio.Num != 0)
                 SAR = codecCtx->sample_aspect_ratio;
             else if (SAR.Num == 0)
                 SAR = new(1, 1);
-
-            int x, y;
-            _ = av_reduce(&x, &y, Width * SAR.Num, Height * SAR.Den, 1024 * 1024);
-            AspectRatio = new(x, y);
         }
 
-        if (frame->flags.HasFlag(FrameFlags.Interlaced))
-            FieldOrder = frame->flags.HasFlag(FrameFlags.TopFieldFirst) ? DeInterlace.TopField : DeInterlace.BottomField;
+        cropRect = CropRect.Empty;
+
+        // Stream's Crop
+        if (hasStreamCrop)
+        {
+            Cropping =  Cropping.Stream;
+
+            cropRect.Top    += cropStreamRect.Top;
+            cropRect.Bottom += cropStreamRect.Bottom;
+            cropRect.Left   += cropStreamRect.Left;
+            cropRect.Right  += cropStreamRect.Right;
+
+        }
         else
-            FieldOrder = codecCtx->field_order == AVFieldOrder.Tt ? DeInterlace.TopField : (codecCtx->field_order == AVFieldOrder.Bb ? DeInterlace.BottomField : DeInterlace.Progressive);
+            Cropping = Cropping.None;
+
+        // Codec's Crop (Frame)
+        cropFrameRect = new(
+            top:    (uint)frame->crop_top,
+            bottom: (uint)frame->crop_bottom,
+            left:   (uint)frame->crop_left,
+            right:  (uint)frame->crop_right
+            );
+
+        if (cropFrameRect != CropRect.Empty)
+        {
+            Cropping |= Cropping.Codec;
+
+            cropRect.Top    += cropFrameRect.Top;
+            cropRect.Bottom += cropFrameRect.Bottom;
+            cropRect.Left   += cropFrameRect.Left;
+            cropRect.Right  += cropFrameRect.Right;
+        }
+
+        // HW Texture's Crop
+        if (decoder.VideoAccelerated)
+        {
+            var desc = decoder.textureFFmpeg.Description;
+
+            if (desc.Width > codecCtx->coded_width)
+            {
+                cropRect.Right += (uint)(desc.Width - codecCtx->coded_width);
+                Cropping |= Cropping.Texture;
+            }
+
+            if (desc.Height > codecCtx->coded_height)
+            {
+                cropRect.Bottom += (uint)(desc.Height - codecCtx->coded_height);
+                Cropping |= Cropping.Texture;
+            }
+        }
+
+        Width   = (uint)(frame->width  - (cropRect.Left + cropRect.Right));
+        Height  = (uint)(frame->height - (cropRect.Top  + cropRect.Bottom));
+
+        if (frame->flags.HasFlag(FrameFlags.Interlaced))
+            FieldOrder = frame->flags.HasFlag(FrameFlags.TopFieldFirst) ? VideoFrameFormat.InterlacedTopFieldFirst : VideoFrameFormat.InterlacedBottomFieldFirst;
+        else
+            FieldOrder = codecCtx->field_order == AVFieldOrder.Tt ? VideoFrameFormat.InterlacedTopFieldFirst : (codecCtx->field_order == AVFieldOrder.Bb ? VideoFrameFormat.InterlacedBottomFieldFirst : VideoFrameFormat.Progressive);
 
         if (ColorTransfer == AVColorTransferCharacteristic.Unspecified) // TBR: AVStream has AribStdB67 and Frame/CodecCtx has Bt2020_10 (priority to stream?)*
         {
@@ -172,7 +236,7 @@ public unsafe class VideoStream : StreamBase
             else if (ColorRange == ColorRange.None)
                 ColorRange = ColorType == ColorType.YUV && !PixelFormatStr.Contains('j') ? ColorRange.Limited : ColorRange.Full; // yuvj family defaults to full
         }
-        
+
         if (ColorTransfer == AVColorTransferCharacteristic.AribStdB67)
             HDRFormat = HDRFormat.HLG;
         else if (ColorTransfer == AVColorTransferCharacteristic.Smpte2084)
@@ -205,7 +269,7 @@ public unsafe class VideoStream : StreamBase
             else if (ColorSpace == ColorSpace.None)
                 ColorSpace = Height > 576 ? ColorSpace.Bt709 : ColorSpace.Bt601;
         }
-        
+
         // We consider that FPS can't change (only if it was missing we fill it)
         if (FPS == 0.0)
         {
@@ -217,7 +281,7 @@ public unsafe class VideoStream : StreamBase
         }
 
         // FPS2 / FrameDuration2 (DeInterlace)
-        if (FieldOrder != DeInterlace.Progressive)
+        if (FieldOrder != VideoFrameFormat.Progressive)
         {
             FPS2 = FPS;
             FrameDuration2 = FrameDuration;
@@ -230,10 +294,10 @@ public unsafe class VideoStream : StreamBase
             FrameDuration2 = FrameDuration / 2;
         }
 
-        AVFrameSideData* frameSideData;
-        if ((frameSideData = av_frame_get_side_data(frame, AVFrameSideDataType.Displaymatrix)) != null && frameSideData->data != null)
+        var rotData = av_frame_get_side_data(frame, AVFrameSideDataType.Displaymatrix);
+        if (rotData != null && rotData->data != null)
         {
-            var rotation = -Math.Round(av_display_rotation_get((int*)frameSideData->data));
+            var rotation = -Math.Round(av_display_rotation_get((int*)rotData->data));
             Rotation = rotation - (360*Math.Floor(rotation/360 + 0.9/360));
         }
 
@@ -259,5 +323,12 @@ public unsafe class VideoStream : StreamBase
 
             PixelPlanes++;
         }
+    }
+
+    public AspectRatio GetDAR()
+    {
+        int x, y;
+        _ = av_reduce(&x, &y, Width * SAR.Num, Height * SAR.Den, 1024 * 1024);
+        return new(x, y);
     }
 }
