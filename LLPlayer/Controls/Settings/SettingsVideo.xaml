@@ -87,6 +87,20 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock
                             Width="180"
+                            Text="Super Resolution" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Nvidia" VerticalAlignment="Center" Margin="0 0 6 0" />
+                            <ToggleButton
+                                IsChecked="{Binding FL.PlayerConfig.Video.SuperResolutionNvidia}" />
+                            <TextBlock Text="Intel" VerticalAlignment="Center" Margin="2 0 6 0" />
+                            <ToggleButton
+                                IsChecked="{Binding FL.PlayerConfig.Video.SuperResolutionIntel}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock
+                            Width="180"
                             Text="Profile Mismatch" />
                         <ToggleButton
                             IsChecked="{Binding FL.PlayerConfig.Decoder.AllowProfileMismatch}" />
@@ -131,11 +145,29 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock
                             Width="180"
+                            Text="Zoom Unit" />
+                        <TextBox
+                            Width="100"
+                            Text="{Binding FL.PlayerConfig.Player.ZoomOffset}"
+                            helpers:TextBoxHelper.OnlyNumeric="Int" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock
+                            Width="180"
                             Text="Max Latency (ms)" />
                         <TextBox
                             Width="100"
                             Text="{Binding FL.PlayerConfig.Player.MaxLatency, Converter={StaticResource TicksToMilliSecondsConv}}"
                             helpers:TextBoxHelper.OnlyNumeric="Int" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock
+                            Width="180"
+                            Text="Zero Latency" />
+                        <ToggleButton
+                            IsChecked="{Binding FL.PlayerConfig.Player.ZeroLatency}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
@@ -165,16 +197,6 @@
                             Width="30"
                             Margin="4 0 0 0"
                             Text="{Binding FL.PlayerConfig.Video.SDRDisplayNits}"
-                            helpers:TextBoxHelper.OnlyNumeric="Int" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock
-                            Width="180"
-                            Text="Zoom Unit" />
-                        <TextBox
-                            Width="100"
-                            Text="{Binding FL.PlayerConfig.Player.ZoomOffset}"
                             helpers:TextBoxHelper.OnlyNumeric="Int" />
                     </StackPanel>
                 </StackPanel>

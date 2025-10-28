@@ -258,6 +258,12 @@ public class Config : NotifyPropertyChanged
         public double   IdleFps                     { get; set; } = 60.0;
 
         /// <summary>
+        /// Zero Latency forces playback at the very last frame received (Live Video Only)
+        /// </summary>
+        public bool     ZeroLatency                 { get => _ZeroLatency; set { Set(ref _ZeroLatency, value); if (config != null) config.Decoder.LowDelay = value; if (player != null && player.IsPlaying) { player.Pause(); player.Play(); } } }
+        bool _ZeroLatency;
+
+        /// <summary>
         /// Max Latency (ticks) forces playback (with speed x1+) to stay at the end of the live network stream (default: 0 - disabled)
         /// </summary>
         public long     MaxLatency {
@@ -760,11 +766,6 @@ public class Config : NotifyPropertyChanged
         /// </summary>
         public bool             SuperResolutionIntel        { get => _SuperResolutionIntel;         set { Set(ref _SuperResolutionIntel, value); player?.renderer?.UpdateSuperResIntel(value); } }
         internal bool _SuperResolutionIntel;
-
-        /// <summary>
-        /// In case of no hardware accelerated or post process accelerated pixel formats will use FFmpeg's SwsScale
-        /// </summary>
-        public bool             SwsHighQuality              { get; set; } = false;
 
         /// <summary>
         /// Forces SwsScale instead of FlyleafVP for non HW decoded frames

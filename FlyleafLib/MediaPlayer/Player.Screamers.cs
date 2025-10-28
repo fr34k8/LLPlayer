@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿﻿using System.Diagnostics;
 
 using Vortice.Direct3D11;
 
@@ -84,6 +84,7 @@ unsafe partial class Player
             return;
 
         renderer.Present(vFrame);
+        Video.framesDisplayed++;
 
         if (!seeks.IsEmpty)
             return;
@@ -1123,6 +1124,37 @@ unsafe partial class Player
             if (vFrame != null)
                 vFrame.timestamp = (long) (vFrame.timestamp / Speed);
         }
+    }
+
+    private void ScreamerZeroLatency()
+    {
+        // Video Only | IsLive | No Deinterlacing | No Frame Stepping / Curtime | No Bitrate Stats | No Buffered Duration | Frame rate = receiving packets rate
+
+        var vDecoder = VideoDecoder;
+        var renderer = vDecoder.Renderer;
+
+        VideoDemuxer.Pause();
+        vDecoder.Pause();
+        VideoDemuxer.DisposePackets();
+        vDecoder.Flush();
+
+        while (Status == Status.Playing)
+        {
+            vFrame = vDecoder.GetFrameNext();
+            if (vFrame == null)
+                break;
+
+            // Required?
+            //curTime = vFrame.timestamp;
+            //UI(() => Set(ref _CurTime, curTime, true, nameof(CurTime)));
+
+            if (renderer.Present(vFrame, false))
+                Video.framesDisplayed++;
+            else
+                Video.framesDropped++;
+        }
+
+        if (CanInfo) Log.Info($"Finished -> {TicksToTime(CurTime)}");
     }
 }
 

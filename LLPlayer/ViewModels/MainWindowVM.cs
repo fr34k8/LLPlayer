@@ -141,6 +141,9 @@ public class MainWindowVM : Bindable
         {
             if (!args.Success || args.IsSubtitles)
             {
+                if (!args.IsSubtitles)
+                    FL.Player.renderer?.ClearScreenForce();
+
                 return;
             }
 
