@@ -756,16 +756,10 @@ public class Config : NotifyPropertyChanged
         public int              MaxVerticalResolution       => MaxVerticalResolutionCustom == 0 ? (MaxVerticalResolutionAuto != 0 ? MaxVerticalResolutionAuto : 1080) : MaxVerticalResolutionCustom;
 
         /// <summary>
-        /// Sets Nvidia Super Resolution (D3D11VP only)
+        /// Sets Super Resolution (Nvidia / Intel - D3D11VP only)
         /// </summary>
-        public bool             SuperResolutionNvidia       { get => _SuperResolutionNvidia;        set { Set(ref _SuperResolutionNvidia, value); player?.renderer?.UpdateSuperResNvidia(value); } }
-        internal bool _SuperResolutionNvidia;
-
-        /// <summary>
-        /// Sets Intel Super Resolution (D3D11VP only)
-        /// </summary>
-        public bool             SuperResolutionIntel        { get => _SuperResolutionIntel;         set { Set(ref _SuperResolutionIntel, value); player?.renderer?.UpdateSuperResIntel(value); } }
-        internal bool _SuperResolutionIntel;
+        public bool             SuperResolution             { get => _SuperResolution;  set { if (Set(ref _SuperResolution, value)) player?.renderer?.UpdateSuperRes(); } }
+        internal bool _SuperResolution;
 
         /// <summary>
         /// Forces SwsScale instead of FlyleafVP for non HW decoded frames
@@ -890,12 +884,10 @@ public class Config : NotifyPropertyChanged
         internal void SetEnabled(bool enabled)      => Set(ref _Enabled, enabled, true, nameof(Enabled));
 
         /// <summary>
-        /// Whether to process samples with Filters or SWR (experimental)<br/>
-        /// 1. Requires FFmpeg avfilter lib<br/>
-        /// 2. Currently SWR performs better if you dont need filters<br/>
+        /// Uses FFmpeg filters instead of Swr (better speed quality and support for extra filters, requires avfilter-X.dll)
         /// </summary>
         public bool             FiltersEnabled      { get => _FiltersEnabled; set { if (Set(ref _FiltersEnabled, value && Engine.Config.FFmpegLoadProfile != LoadProfile.Main)) player?.AudioDecoder.SetupFiltersOrSwr(); } }
-        bool _FiltersEnabled = false;
+        bool _FiltersEnabled = true;
 
         /// <summary>
         /// List of filters for post processing the audio samples (experimental)<br/>

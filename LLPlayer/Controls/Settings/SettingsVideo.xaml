@@ -88,14 +88,8 @@
                         <TextBlock
                             Width="180"
                             Text="Super Resolution" />
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Nvidia" VerticalAlignment="Center" Margin="0 0 6 0" />
-                            <ToggleButton
-                                IsChecked="{Binding FL.PlayerConfig.Video.SuperResolutionNvidia}" />
-                            <TextBlock Text="Intel" VerticalAlignment="Center" Margin="2 0 6 0" />
-                            <ToggleButton
-                                IsChecked="{Binding FL.PlayerConfig.Video.SuperResolutionIntel}" />
-                        </StackPanel>
+                        <ToggleButton
+                            IsChecked="{Binding FL.PlayerConfig.Video.SuperResolution}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">

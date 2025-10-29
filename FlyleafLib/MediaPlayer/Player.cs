@@ -601,6 +601,8 @@ public unsafe partial class Player : NotifyPropertyChanged, IDisposable
     }
     private void Reset()
     {
+        // TODO: Consider partial reset on opening and full reset in case of open failed (otherwise let it overwrite)
+
         ResetMe();
         Video.Reset();
         Audio.Reset();
