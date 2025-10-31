@@ -8,6 +8,7 @@ namespace FlyleafLib.MediaPlayer;
 
 unsafe partial class Player
 {
+    const int MAX_DEQUEUE_RETRIES = 20; // (Ms) Tries to avoid re-buffering by waiting the decoder to catch up
     volatile bool isScreamerVASDAudio;
     volatile bool stopScreamerVASDAudio;
 
@@ -88,7 +89,7 @@ unsafe partial class Player
         {
             lastSpeedChangeTicks = DateTime.UtcNow.Ticks;
             showOneFrame = false;
-            Speed = 1;
+            speed = AudioDecoder.Speed = VideoDecoder.Speed = 1;
         }
 
         do
@@ -212,16 +213,24 @@ unsafe partial class Player
          * SecondField goes to Renderer
          * isVideoSwitch should be removed as we use requiresBuffering all time for that?*
          * Warm up to avoid initial drop frames and get accurate FrameStatistics / refresh rate sync with monitor (cpu-gpu sync, possible with Dwm?)
+         * We actually need +1 extra frame not for renderer but for the time that we TryDequeue 1 frame and at the same time we keep the LastFrame for the renderer
+         *  If we swap it directly we will not need this anymore (however this could cause losing the LastFrame if the new one is corrupted/failed etc.)
+         *  We could also get rid of vFrame (use only LastFrame) and no bother disposing it just keep the timestamp from renderframe until present
          */
 
-        bool secondField    = false;
+        bool secondField = false; // To be transfered in renderer
+        int dequeueRetries;
 
         while (status == Status.Playing)
         {
             // Seeks and then requiresBuffering | TBR: missing SeekCompleted callback?
             if (seeks.TryPop(out var seekData))
             {
+                if (vFrame != null && vFrame != renderer.LastFrame) // TBR: lock*?
+                    { VideoDecoder.DisposeFrame(vFrame); vFrame = null; }
+
                 renderer.RenderPlayStop();
+
                 seeks.Clear();
                 requiresBuffering = true;
                 ResetFrameStats();
@@ -270,6 +279,7 @@ unsafe partial class Player
 
                 decoder.PauseDecoders(); // TBR: Required to avoid gettings packets between Seek and ShowFrame which causes resync issues
                 StopScreamerVASDAudio();
+
                 if (decoder.Seek(seekData.accurate ? Math.Max(0, seekData.ms - 3000) : seekData.ms, seekData.forward, !seekData.accurate) < 0) // Consider using GetVideoFrame with no timestamp (any) to ensure keyframe packet for faster seek in HEVC
                     Log.Warn("[V] Seek Failed");
                 else if (seekData.accurate)
@@ -279,7 +289,11 @@ unsafe partial class Player
             // Ensures we have rendered vFrame ready for present (startTicks/sw)
             if (requiresBuffering)
             {
+                if (vFrame != null && vFrame != renderer.LastFrame) // TBR: lock*?
+                    { VideoDecoder.DisposeFrame(vFrame); vFrame = null; }
+
                 renderer.RenderPlayStop();
+
                 if (Config.Player.Stats && framesDisplayedDwmEnd > 0)
                 {
                     framesDisplayedDwmEnd   = renderer.GetFrameStatistics().PresentCount - framesDisplayedDwmStart;
@@ -295,7 +309,6 @@ unsafe partial class Player
                 StopScreamerVASDAudio();
                 BufferVASD();
                 requiresBuffering = false;
-                renderer.RenderPlayStart();
                 if (!seeks.IsEmpty)
                     continue;
 
@@ -308,6 +321,8 @@ unsafe partial class Player
 
                     break;
                 }
+
+                renderer.RenderPlayStart();
 
                 // Prepare 2nd Frame (after ShowOneFrame)
                 if (!renderer.RenderPlay(vFrame, false)) // interlace 2nd frame probably here
@@ -350,39 +365,46 @@ unsafe partial class Player
             }
 
             // Valid for Present | -3 to 2 (5ms breath)
-            elapsedTicks = (long) (sw.ElapsedTicks * SWFREQ_TO_TICKS);
+            elapsedTicks = (long)(sw.ElapsedTicks * SWFREQ_TO_TICKS);
             vDistanceMs  = (int) ((((vFrame.timestamp - startTicks) / speed) - elapsedTicks) / 10000);
 
             // CPU Drops to avoid dropping in GPU and also losing sync
             if (vDistanceMs < -3)
             {
-                framesFailed++; // don't dispose vFrame is on renderer
                 if (CanDebug) Log.Debug($"[V] Frame Dropped ({vDistanceMs})");
+
+                vFrame      = null; // don't dispose (LastFrame)
+                secondField = false;
+                framesFailed++;
 
                 if (vDistanceMs < -50)// || GetBufferedDuration() < Config.Player.MinBufferDuration / 2)
                 {
-                    vFrame = null;
                     requiresBuffering = true;
                     continue;
                 }
 
-                while (!isVideoSwitch && VideoDecoder.Frames.TryDequeue(out vFrame) && vFrame != null && (int) ((((vFrame.timestamp - startTicks) / speed) - (long) (sw.ElapsedTicks * SWFREQ_TO_TICKS)) / 10_000) < 0)
+                dequeueRetries = MAX_DEQUEUE_RETRIES;
+                do
                 {
+                    while (!isVideoSwitch && !VideoDecoder.Frames.TryDequeue(out vFrame) && dequeueRetries-- > 0)
+                        Thread.Sleep(1);
+
+                    if (vFrame == null)
+                        break;
+
+                    if ((int) ((((vFrame.timestamp - startTicks) / speed) - (long) (sw.ElapsedTicks * SWFREQ_TO_TICKS)) / 10_000) >= 0)
+                        break; // found
+
                     framesFailed++;
                     if (CanDebug) Log.Debug($"[V] Frame Dropped ({(int) ((((vFrame.timestamp - startTicks) / speed) - (long) (sw.ElapsedTicks * SWFREQ_TO_TICKS)) / 10_000)}:M)");
                     VideoDecoder.DisposeFrame(vFrame); vFrame = null;
-                }
+                } while (true);
 
-                if (vFrame == null)
-                    continue;
-
-                secondField = false;
-                if (!renderer.RenderPlay(vFrame, secondField))
+                if (vFrame != null && !renderer.RenderPlay(vFrame, secondField))
                 {
                     framesFailed++;
                     vFrame = null;
                     requiresBuffering = true;
-                    continue;
                 }
 
                 continue;
@@ -417,6 +439,9 @@ unsafe partial class Player
             else
                 framesFailed++;
 
+            if (Config.Player.MaxLatency != 0)
+                CheckLatency();
+
             if (renderer.FieldType != VideoFrameFormat.Progressive && Config.Video.DoubleRate && !secondField)
             {
                 secondField = true;
@@ -429,15 +454,11 @@ unsafe partial class Player
             }
             else
             {
-                secondField = false;
-
-                if (!isVideoSwitch) VideoDecoder.Frames.TryDequeue(out vFrame); else vFrame = null;
-                if (vFrame == null)
-                {   // Tries to avoid re-buffering by waiting the decoder to catch up
-                    int retries = 20;
-                    while (!isVideoSwitch && !VideoDecoder.Frames.TryDequeue(out vFrame) && retries-- > 0)
-                        Thread.Sleep(1);
-                }
+                vFrame          = null; // don't dispose (LastFrame)
+                secondField     = false;
+                dequeueRetries  = MAX_DEQUEUE_RETRIES;
+                while (!isVideoSwitch && !VideoDecoder.Frames.TryDequeue(out vFrame) && dequeueRetries-- > 0)
+                    Thread.Sleep(1);
 
                 if (vFrame != null && !renderer.RenderPlay(vFrame, secondField))
                 {
@@ -445,9 +466,6 @@ unsafe partial class Player
                     vFrame = null;
                 }
             }
-
-            if (vFrame != null && Config.Player.MaxLatency != 0)
-                CheckLatency();
 
             // Subs | Data (just transfered for now TBR - might lose sync with video above)
             bool subOpened = false;
@@ -645,6 +663,8 @@ unsafe partial class Player
 
         } // while Playing
 
+        if (vFrame != null && vFrame != renderer.LastFrame) // TBR: lock*?
+            { VideoDecoder.DisposeFrame(vFrame); vFrame = null; }
         renderer.RenderPlayStop();
         StopScreamerVASDAudio();
 
@@ -685,6 +705,7 @@ unsafe partial class Player
         if (newSpeed > 4) // TBR: dispose only as much as required to avoid rebuffering
         {
             decoder.Flush();
+            vFrame = null; // don't dispose (LastFrame)
             requiresBuffering = true;
             if (CanDebug) Log.Debug($"[Latency {curLatency/10000}ms] Clearing queue");
             return;
@@ -706,24 +727,16 @@ unsafe partial class Player
 
         if (CanDebug) Log.Debug($"[Latency {curLatency/10000}ms] Speed changed x{speed} -> x{newSpeed}");
 
-        if (aFrame != null)
-            AudioDecoder.FixSample(aFrame, speed, newSpeed);
-
-        Speed       = newSpeed;
-        requiresBuffering
-                    = false;
+        //if (aFrame != null) AudioDecoder.FixSample(aFrame, newSpeed); // Requires lock
+        speed = AudioDecoder.Speed = VideoDecoder.Speed = newSpeed;
         startTicks  = curTime;
         sw.Restart();
     }
-    long GetBufferedDuration()
-    {
-        var decoder = VideoDecoder.Frames.IsEmpty ? 0 : VideoDecoder.Frames.ToArray()[^1].timestamp - vFrame.timestamp;
-        var demuxer = VideoDemuxer.VideoPackets.IsEmpty || VideoDemuxer.VideoPackets.LastTimestamp == NoTs
-            ? 0 :
-            (VideoDemuxer.VideoPackets.LastTimestamp - VideoDemuxer.StartTime) - vFrame.timestamp;
 
-        return Math.Max(decoder, demuxer);
-    }
+    long GetBufferedDuration() // No speed aware
+        => renderer.FieldType != VideoFrameFormat.Progressive && Config.Video.DoubleRate ?
+        (VideoDecoder.Frames.Count + VideoDemuxer.VideoPackets.Count) * renderer.VideoStream.FrameDuration2 :
+        (VideoDecoder.Frames.Count + VideoDemuxer.VideoPackets.Count) * renderer.VideoStream.FrameDuration;
 
     void ScreamerVASDAudio()
     {
@@ -760,7 +773,7 @@ unsafe partial class Player
             {
                 if (bufferTicks > MIN_PLAY_BUFFER)      // Play Buffer has enough samples
                     Thread.Sleep(10);
-                else if (bufferTicks < 3_0000)          // Low Play Buffer (risk of using latency on next buffer submit)
+                else if (bufferTicks < 3_0000 && Config.Player.MaxLatency == 0) // Low Play Buffer (risk of using latency on next buffer submit)
                     shouldResync = true;
                 else if (bufferTicks <= MIN_PLAY_BUFFER)// Re-filling an already filled buffer | We consider continues (no waitTicks check) however desyncMs will catch it
                 {
