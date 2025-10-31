@@ -190,10 +190,10 @@ unsafe partial class Player
                 SubtitleClear(i);
             }
 
-            if (VideoDecoder.Frames.IsEmpty)
+            if (vFrames.IsEmpty)
                 vFrame = VideoDecoder.GetFrameNext();
             else
-                VideoDecoder.Frames.TryDequeue(out vFrame);
+                vFrames.TryDequeue(out vFrame);
 
             if (vFrame == null)
                 return;
@@ -237,13 +237,13 @@ unsafe partial class Player
                 SubtitleClear(i);
             }
 
-            if (VideoDecoder.Frames.IsEmpty)
+            if (vFrames.IsEmpty)
             {
                 reversePlaybackResync = true; // Temp fix for previous timestamps until we seperate GetFrame for Extractor and the Player
                 vFrame = VideoDecoder.GetFrame(VideoDecoder.GetFrameNumber(CurTime) - 1, true);
             }
             else
-                VideoDecoder.Frames.TryDequeue(out vFrame);
+                vFrames.TryDequeue(out vFrame);
 
             if (vFrame == null)
                 return;
