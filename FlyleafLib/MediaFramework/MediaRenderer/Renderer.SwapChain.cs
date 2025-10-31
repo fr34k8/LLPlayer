@@ -14,7 +14,6 @@ namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 unsafe public partial class Renderer
 {
-    internal bool           forceViewToControl; // Makes sure that viewport will fill the exact same size with the control (mainly for keep ratio on resize)
     volatile bool           canRenderPresent;   // Don't render / present during minimize (or invalid size)
 
     ID3D11Texture2D         backBuffer;
@@ -45,7 +44,7 @@ unsafe public partial class Renderer
             Width               = (uint)width,
             Height              = (uint)height,
             AlphaMode           = AlphaMode.Premultiplied,  // TBR
-            SwapEffect          = SwapEffect.FlipDiscard,   
+            SwapEffect          = SwapEffect.FlipDiscard,
             Scaling             = Scaling.Stretch,          // DComp can't validate widhth/height?*
             BufferCount         = Math.Max(Config.Video.SwapBuffers, 2),
             SampleDescription   = new SampleDescription(1, 0),
@@ -74,8 +73,8 @@ unsafe public partial class Renderer
 
             try
             {
-                Log.Info($"Initializing {(Config.Video.Swap10Bit ? "10-bit" : "8-bit")} swap chain [Handle: {handle}, Buffers: {Config.Video.SwapBuffers}, Format: {(Config.Video.Swap10Bit ? Format.R10G10B10A2_UNorm : BGRA_OR_RGBA)}]");
-                swapChain = Engine.Video.Factory.CreateSwapChainForComposition(Device, GetSwapChainDesc(ControlWidth, ControlHeight));
+                if (CanInfo) Log.Info($"Initializing {(Config.Video.Swap10Bit ? "10-bit" : "8-bit")} swap chain [Handle: {handle}, Buffers: {Config.Video.SwapBuffers}, Format: {(Config.Video.Swap10Bit ? Format.R10G10B10A2_UNorm : BGRA_OR_RGBA)}]");
+                swapChain = Engine.Video.Factory.CreateSwapChainForComposition(Device, GetSwapChainDesc(2, 2)); // we will resize on rendering
                 DComp.DCompositionCreateDevice(dxgiDevice, out dCompDevice).CheckError();
                 dCompDevice.CreateTargetForHwnd(handle, false, out dCompTarget).CheckError();
                 dCompDevice.CreateVisual(out dCompVisual).CheckError();
@@ -104,8 +103,17 @@ unsafe public partial class Renderer
             backBufferRtv   = Device.CreateRenderTargetView(backBuffer);
             Engine.Video.Factory.MakeWindowAssociation(ControlHandle, WindowAssociationFlags.IgnoreAll);
             AddSubClass();
-            ResizeBuffers(ControlWidth, ControlHeight);
+
             UpdateDisplay(true); // don't force if we let WndProc run without our swapchain
+
+            // Ensures that it will run ResizeBuffers initially
+            lock (lockRenderLoops)
+                if (ControlWidth > 0 && ControlHeight > 0)
+                {
+                    canRenderPresent= true;
+                    needsResize     = true;
+                    RenderRequest();
+                }
         }
     }
     internal void InitializeWinUISwapChain()
@@ -274,7 +282,7 @@ unsafe public partial class Renderer
                 return;
 
             needsViewport   = true;
-            canRenderPresent= true; // TBR: should be re-calculated
+            canRenderPresent= true;
 
             if (refresh)
                 RenderRequest();
@@ -321,7 +329,7 @@ unsafe public partial class Renderer
         }
 
         GetViewport = new((int)(x - xZoomPixels * (float)zoomCenter.X), (int)(y - yZoomPixels * (float)zoomCenter.Y), newWidth, newHeight);
-        
+
         if (videoProcessor == VideoProcessors.D3D11)
         {
             Viewport view = GetViewport;
@@ -439,10 +447,7 @@ unsafe public partial class Renderer
         lock (lockRenderLoops)
         {
             if (SCDisposed || width <= 0 || height <= 0)
-            {
                 canRenderPresent = false;
-                return;
-            }
             else if (ControlWidth == width && ControlHeight == height)
             {
                 // Re-calculate of canRenderPresent
@@ -459,16 +464,16 @@ unsafe public partial class Renderer
                 }
                 else
                     canRenderPresent = true;
-
-                //RenderRequest(); // We don't refresh as we consider same view
-                return;
             }
+            else
+            {
+                ControlWidth    = width;
+                ControlHeight   = height;
+                canRenderPresent= true;
+                needsResize     = true;
 
-            ControlWidth    = width;
-            ControlHeight   = height;
-            needsResize     = true;
-
-            RenderRequest();
+                RenderRequest();
+            }
         }
     }
     void ResizeBuffersInternal()
@@ -520,7 +525,7 @@ unsafe public partial class Renderer
                 return;
 
             this.cornerRadius = cornerRadius;
-            cornerRadiusNeedsUpdate = true;
+            cornerRadiusNeedsUpdate = true; // TBR: Probably false if we reset it back to zero corner radius
 
             if (!SCDisposed)
                 UpdateCornerRadiusInternal();
