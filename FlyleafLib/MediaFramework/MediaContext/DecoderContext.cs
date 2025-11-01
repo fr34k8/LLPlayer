@@ -787,7 +787,8 @@ public unsafe partial class DecoderContext : PluginHandler
                         }
 
                         // Accurate seek with +- half frame distance
-                        if (timestamp != -1 && (long)(frame->pts * VideoStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) < timestamp)
+                        // TBR: Live streams should never been seeked at first place (maybe allow HLSLive?) * can cause infinite loop
+                        if (timestamp != -1 && !VideoDemuxer.IsLive && (long)(frame->pts * VideoStream.Timebase) - VideoDemuxer.StartTime + (VideoStream.FrameDuration / 2) < timestamp)
                         {
                             av_frame_unref(frame);
                             continue;

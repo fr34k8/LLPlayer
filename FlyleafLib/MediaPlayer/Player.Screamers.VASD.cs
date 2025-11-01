@@ -15,7 +15,11 @@ unsafe partial class Player
 
     bool BufferVASD()
     {
-        long aDeviceDelay   = 0;
+        /* [Requires recoding]
+         * We have three different statuses during A/V opening: Closed/Failed, Opening, Opened (Opened means filled from codec / valid format after 'analyze')
+         *  we currently use isOpened only (as two statuses)
+         */
+
         bool gotAudio       = !Audio.IsOpened || Config.Player.MaxLatency != 0;
         bool gotVideo       = false;
         bool shouldStop     = false;
@@ -32,8 +36,6 @@ unsafe partial class Player
 
         if (Audio.isOpened && Config.Audio.Enabled)
         {
-            aDeviceDelay = Audio.GetDeviceDelay();
-
             if (AudioDecoder.OnVideoDemuxer)
                 AudioDecoder.Start();
             else if (!decoder.RequiresResync)
@@ -118,8 +120,10 @@ unsafe partial class Player
                 if (decoder.RequiresResync)
                     decoder.Resync(vFrame.timestamp);
 
-                if (!gotAudio && aFrame != null)
+                if (!gotAudio && aFrame != null && Audio.isOpened) // Could be closed from invalid sample rate
                 {
+                    long aDeviceDelay = Audio.GetDeviceDelay();
+
                     for (int i = 0; i < Math.Min(20, AudioDecoder.Frames.Count); i++)
                     {
                         if (aFrame == null
@@ -220,6 +224,7 @@ unsafe partial class Player
         int vDistanceMs, dDistanceMs;
         int[] sDistanceMss = new int[subNum];
         long elapsedTicks;
+        bool refreshed = false;
 
         while (status == Status.Playing)
         {
@@ -410,16 +415,30 @@ unsafe partial class Player
                 continue;
             }
 
-            // Thread Sleep in Parts | Restarts on Late Frame (2sec?)
+            // Thread Sleep in Parts | 60fps Idle Refresh | Restarts on Late Frame (2sec?)
             if (vDistanceMs > 2)
             {
                 if (vDistanceMs > 11)
                 {
-                    if (vDistanceMs > 2_000) // we might need to avoid disposing vFrame here (e.g. HLS wrapped and that's a keyframe?*)
+                    if (status != Status.Playing)
+                        break;
+
+                    // Late Frame (e.g. HLS wrapped and that's a keyframe?* -we might need to avoid disposing vFrame here)
+                    if (vDistanceMs > 2_000)
                     {
                         requiresBuffering = true;
                         Log.Warn($"[V] Late Frame ({vDistanceMs})");
                     }
+
+                    // Keep ~60fps Idle refresh | TBR: We could avoid preparing frame too early -for slow fps- (as we discard it here)
+                    else if (vDistanceMs > 16 && renderer.RefreshPlay(secondField))
+                    {
+                        if (CanTrace) Log.Trace($"[V] Refreshing {TicksToTime(vFrame.timestamp)}{(secondField ? " | SF" : "")}");
+                        framesDisplayed++;
+                        refreshed = true;
+                    }
+
+                    // Sleep 10ms and recalculate distance
                     else
                         Thread.Sleep(10);
 
@@ -430,14 +449,20 @@ unsafe partial class Player
             }
 
             // Present Current | Render Next
-            if (CanTrace) Log.Trace($"[V] Presenting {TicksToTime(vFrame.timestamp)}{(secondField ? " | SF" : "")}");
-            if (renderer.PresentPlay())
+            if (!refreshed)
             {
-                framesDisplayed++;
-                UpdateCurTime(vFrame.timestamp, false);
+                if (CanTrace) Log.Trace($"[V] Presenting {TicksToTime(vFrame.timestamp)}{(secondField ? " | SF" : "")}");
+
+                if (renderer.PresentPlay())
+                {
+                    framesDisplayed++;
+                    UpdateCurTime(vFrame.timestamp, false);
+                }
+                else
+                    framesFailed++;
             }
             else
-                framesFailed++;
+                refreshed = false;
 
             if (Config.Player.MaxLatency != 0)
                 CheckLatency();
@@ -665,7 +690,8 @@ unsafe partial class Player
 
         if (vFrame != null && vFrame != renderer.LastFrame) // TBR: lock*?
             { VideoDecoder.DisposeFrame(vFrame); vFrame = null; }
-        renderer.RenderPlayStop();
+
+        renderer.RenderPlayStop();  // Calls RenderRequest which ensure present of the last rendered frame
         StopScreamerVASDAudio();
 
         if (Config.Player.Stats)
@@ -792,9 +818,10 @@ unsafe partial class Player
 
                 if (Math.Abs(waitTicks) > 5_000_0000) // Far away
                 {
+                    // TBR: Infinite loop with AllowFindStreamInfo = false on HLS Live (FirstTimestamp different between A/V)
                     Log.Warn($"[A] Late Frame ({TicksToTimeMini(waitTicks)})");
                     requiresBuffering = true;
-                    continue;
+                    break;
                 }
                 else if (waitTicks > 10_0000) // Not yet
                     continue;
@@ -845,7 +872,7 @@ unsafe partial class Player
                 //        Thread.Sleep(1);
                 Audio.ClearBuffer();
 
-                if (CanDebug) Log.Debug($"[A] Resynced at {TicksToTimeMini(aFrame.timestamp)} [Diff: {TicksToTimeMini((long)((aFrame.timestamp - startTicks) / speed) - delayTicks)} | {TicksToTimeMini((long)(sw.ElapsedTicks * SWFREQ_TO_TICKS))}]");
+                if (CanInfo) Log.Info($"[A] Resynced at {TicksToTimeMini(aFrame.timestamp)} [Diff: {TicksToTimeMini((long)((aFrame.timestamp - startTicks) / speed) - delayTicks)} | {TicksToTimeMini((long)(sw.ElapsedTicks * SWFREQ_TO_TICKS))}]");
 
                 // Fill Enough Samples
                 desyncMs = 0;
@@ -908,7 +935,7 @@ unsafe partial class Player
     uint showFrameCount, framesFailed, framesDisplayed, framesDisplayedDwm, framesDisplayedDwmStart, framesDisplayedDwmEnd;
     internal void ResetFrameStats()
     {
-        if (Config.Player.Stats && showFrameCount != 0)
+        if (Config.Player.Stats)
         {
             /*Video.fpsCurrent = */showFrameCount = framesFailed = framesDisplayed = framesDisplayedDwm = framesDisplayedDwmEnd = 0;
             UI(() => /*Video.FPSCurrent = */Video.FramesDropped = Video.FramesDisplayed = 0);

@@ -195,8 +195,8 @@ public unsafe partial class Player : NotifyPropertyChanged, IDisposable
             }
         }
     }
-
-    internal Status _Status = Status.Stopped, status = Status.Stopped;
+    internal volatile Status status = Status.Stopped;
+    internal Status _Status = Status.Stopped;
     public bool         IsPlaying           => status == Status.Playing;
     public bool         IsOpening           => status == Status.Opening;
 
