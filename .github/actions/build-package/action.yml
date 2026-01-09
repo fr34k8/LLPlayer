@@ -4,6 +4,10 @@ inputs:
   archive-name:
     description: 'archive name including extension'
     required: true
+  yt-dlp-version:
+    description: 'yt-dlp version to download'
+    required: false
+    default: '2025.08.20'
 runs:
   using: "composite"
   steps:
@@ -67,18 +71,19 @@ runs:
         New-Item -ItemType Directory -Path "$pub\Plugins\YoutubeDL"
         Copy-Item "$pubY\YoutubeDL.dll","$pubY\YoutubeDL.pdb" -Destination "$pub\Plugins\YoutubeDL"
 
-    - name: Get latest yt-dlp release
-      id: fetch-yt
-      uses: pozetroninc/github-action-get-latest-release@master
-      with:
-        repository: yt-dlp/yt-dlp
-        excludes: prerelease,draft
+    # - name: Get latest yt-dlp release
+    #   id: fetch-yt
+    #   uses: pozetroninc/github-action-get-latest-release@master
+    #   with:
+    #     repository: yt-dlp/yt-dlp
+    #     excludes: prerelease,draft
 
     - name: Download yt-dlp.exe
       shell: pwsh
       run: |
         $pub = "${{ runner.temp }}\publish"
-        $ver = "${{ steps.fetch-yt.outputs.release }}"
+        # $ver = "${{ steps.fetch-yt.outputs.release }}"
+        $ver = "${{ inputs.yt-dlp-version }}"
         $url = "https://github.com/yt-dlp/yt-dlp/releases/download/$ver/yt-dlp.exe"
         $outDir = "$pub\Plugins\YoutubeDL"
         New-Item -Path "$outDir\yt-dlp.exe_here" -ItemType File
