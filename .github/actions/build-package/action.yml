@@ -14,18 +14,15 @@ runs:
 
     - name: Restore dependencies
       shell: pwsh
-      run: dotnet restore
+      run: dotnet restore .\LLPlayer\LLPlayer.csproj /p:PublishReadyToRun=true
 
     - name: Build App
       shell: pwsh
       run: |
-        dotnet publish .\LLPlayer\LLPlayer.csproj `
-          --configuration Release `
-          --runtime win-x64 `
-          --self-contained false `
-          -p:PublishSingleFile=true `
-          -p:PublishReadyToRun=true `
-          --output ${{ runner.temp }}\publish
+        dotnet msbuild .\LLPlayer\LLPlayer.csproj `
+          /t:Publish `
+          /p:PublishProfile=FolderProfile `
+          /p:PublishDir=${{ runner.temp }}\publish
 
     - name: Clean build
       shell: pwsh
@@ -49,17 +46,18 @@ runs:
         # Copy FFmpeg
         Copy-Item .\FFmpeg -Destination $pub -Recurse
 
-    - name: Build Plugin (YoutubeDL)
+    - name: Restore dependencies for Plugins
       shell: pwsh
       run: |
-        dotnet publish .\Plugins\YoutubeDL\YoutubeDL.csproj `
-          --configuration Release `
-          --runtime win-x64 `
-          --framework net10.0-windows10.0.18362.0 `
-          --self-contained false `
-          -p:PublishSingleFile=false `
-          -p:PublishReadyToRun=true `
-          --output ${{ runner.temp }}\publish-YoutubeDL
+        dotnet restore .\Plugins\YoutubeDL\YoutubeDL.csproj /p:PublishReadyToRun=true
+
+    - name: Build Plugins
+      shell: pwsh
+      run: |
+        dotnet msbuild .\Plugins\YoutubeDL\YoutubeDL.csproj `
+          /t:Publish `
+          /p:PublishProfile=FolderProfile `
+          /p:PublishDir=${{ runner.temp }}\publish-YoutubeDL
 
     - name: Copy Plugin DLLs
       shell: pwsh
